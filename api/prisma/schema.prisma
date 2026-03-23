@@ -1,0 +1,39 @@
+// Définition de la datasource SQLite
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Générateur du client Prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Table Scaner
+model Scaner {
+  id          String  @id @default(uuid())
+  isActivated Boolean
+  level       Int     @default(0)
+  tag         String
+  logs        Log[]
+}
+
+// Table Card
+model Card {
+  id          String  @id @default(uuid())
+  isActivated Boolean
+  level       Int     @default(0)
+  owner       String
+  tag         String
+  logs        Log[]
+}
+
+// Table Log
+model Log {
+  id       Int     @id @default(autoincrement())
+  scaner   Scaner  @relation(fields: [scanerId], references: [id])
+  scanerId String
+  by       Card    @relation(fields: [byId], references: [id])
+  byId     String
+  date     DateTime @default(now())
+}
