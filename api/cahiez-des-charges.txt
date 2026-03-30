@@ -1,0 +1,16 @@
+
+Le serveur d'api doit
+
+- si la db sqlite n'existe pas la créer avec les table
+- les table son :
+	- cards: id, level, owner
+	- cardReaders: id, level
+	- logs: cardId, cardreaderId, date, levelInScan
+- L'api doit pouvoir faire :
+	- admin
+		- ajouter/suppre/edit/get un user
+		- get out les user via regex
+		- ajouter/suppre/edit/get un cardReaders
+		- get out les cardReaders via regex
+		- get les log via regex (et limite de sorite)
+	- demander de check un card id (ça log l'action, dans logs et dans print) -> répond si valide ou non sans détaille
