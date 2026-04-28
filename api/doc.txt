@@ -1,0 +1,164 @@
+# API Contrôle d'Accès — Documentation
+
+Serveur HTTP léger en Python (stdlib uniquement). Pas d'authentification requise.
+
+**Base URL :** `http://localhost:8000`  
+**Format :** JSON (`Content-Type: application/json`)
+
+---
+
+## Modèles de données
+
+| Table | Champs |
+|---|---|
+| `cards` | `id` (string), `level` (int), `owner` (string) |
+| `cardReaders` | `id` (string), `level` (int) |
+| `logs` | `id` (auto), `cardId`, `cardReaderId`, `date` (ISO 8601 UTC), `levelInScan` (int) |
+
+**Logique d'accès :** une carte est autorisée sur un lecteur si `card.level >= reader.level`.
+
+---
+
+## Endpoint principal
+
+### `POST /check`
+Vérifie si une carte est autorisée sur un lecteur. Logue l'événement.
+
+**Body**
+```json
+{ "cardId": "CARD-001", "readerId": "READER-A" }
+```
+
+**Réponse**
+```json
+{ "valid": true }
+```
+> `valid: false` si la carte n'existe pas, si le lecteur n'existe pas, ou si le niveau est insuffisant.
+
+---
+
+## Admin — Cartes `/admin/cards`
+
+### `POST /admin/cards` — Créer une carte
+```json
+{ "id": "CARD-001", "level": 2, "owner": "Alice" }
+```
+→ `201` avec l'objet créé
+
+### `GET /admin/cards` — Lister toutes les cartes
+```
+GET /admin/cards
+GET /admin/cards?q=^CARD-0    ← filtre regex sur l'id
+```
+→ `200` avec tableau
+
+### `GET /admin/cards/:id` — Obtenir une carte
+```
+GET /admin/cards/CARD-001
+```
+→ `200` avec l'objet, ou `404`
+
+### `PUT /admin/cards/:id` — Modifier une carte
+```json
+{ "level": 3, "owner": "Bob" }
+```
+→ `200` avec l'objet mis à jour (seuls les champs envoyés sont modifiés)
+
+### `DELETE /admin/cards/:id` — Supprimer une carte
+→ `200 { "deleted": "CARD-001" }` ou `404`
+
+---
+
+## Admin — Lecteurs `/admin/readers`
+
+Identique aux cartes mais sans `owner`.
+
+| Méthode | Route | Description |
+|---|---|---|
+| `POST` | `/admin/readers` | Créer `{ "id", "level" }` |
+| `GET` | `/admin/readers?q=<regex>` | Lister (filtre optionnel) |
+| `GET` | `/admin/readers/:id` | Obtenir |
+| `PUT` | `/admin/readers/:id` | Modifier `{ "level" }` |
+| `DELETE` | `/admin/readers/:id` | Supprimer |
+
+---
+
+## Admin — Logs `/admin/logs`
+
+### `GET /admin/logs` — Consulter les logs
+Paramètres de requête (tous optionnels) :
+
+| Paramètre | Description |
+|---|---|
+| `card=<regex>` | Filtre sur `cardId` |
+| `reader=<regex>` | Filtre sur `cardReaderId` |
+| `limit=<n>` | Limite le nombre de résultats (les plus récents en premier) |
+
+**Exemples**
+```
+GET /admin/logs
+GET /admin/logs?card=^CARD-0&limit=50
+GET /admin/logs?reader=READER-A
+GET /admin/logs?card=CARD-001&reader=READER-A&limit=10
+```
+
+**Réponse**
+```json
+[
+  {
+    "id": 42,
+    "cardId": "CARD-001",
+    "cardReaderId": "READER-A",
+    "date": "2026-04-28T14:32:01Z",
+    "levelInScan": 2
+  }
+]
+```
+
+---
+
+## Codes de retour
+
+| Code | Signification |
+|---|---|
+| `200` | OK |
+| `201` | Créé |
+| `400` | Paramètre manquant ou invalide |
+| `404` | Ressource introuvable |
+| `409` | Conflit (id déjà existant) |
+
+---
+
+## Lancement
+
+```bash
+python server.py
+# → Serveur démarré sur http://0.0.0.0:8000
+```
+
+La base SQLite `access_control.db` est créée automatiquement au premier démarrage.
+
+---
+
+## Exemple complet (curl)
+
+```bash
+# 1. Créer un lecteur niveau 2
+curl -X POST http://localhost:8000/admin/readers \
+     -H "Content-Type: application/json" \
+     -d '{"id":"READER-MAIN","level":2}'
+
+# 2. Créer une carte niveau 3
+curl -X POST http://localhost:8000/admin/cards \
+     -H "Content-Type: application/json" \
+     -d '{"id":"CARD-VIP","level":3,"owner":"Alice"}'
+
+# 3. Vérifier l'accès
+curl -X POST http://localhost:8000/check \
+     -H "Content-Type: application/json" \
+     -d '{"cardId":"CARD-VIP","readerId":"READER-MAIN"}'
+# → {"valid": true}
+
+# 4. Voir les logs
+curl "http://localhost:8000/admin/logs?limit=5"
+```

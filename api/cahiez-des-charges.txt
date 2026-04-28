@@ -14,3 +14,6 @@ Le serveur d'api doit
 		- get out les cardReaders via regex
 		- get les log via regex (et limite de sorite)
 	- demander de check un card id (ça log l'action, dans logs et dans print) -> répond si valide ou non sans détaille
+- SI besouin rajouter les élément a la base de donnée nécessaire.
+- Pas de system d'authentification pour accéder a l'api
+- Faire une doc minimal qui explique comment intérragire avec l'api

@@ -1,209 +1,376 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+"""
+API de contrôle d'accès par carte - Serveur principal
+"""
+
+import sqlite3
 import re
+import json
+from datetime import datetime, timezone
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+import logging
 
-app = Flask(__name__)
-# Configuration de la base de données SQLite
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///access_control.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+DB_PATH = "access_control.db"
 
-db = SQLAlchemy(app)
+# ─── Logging ────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+log = logging.getLogger(__name__)
 
-# ==========================================
-# MODÈLES DE BASE DE DONNÉES
-# ==========================================
 
-class Card(db.Model):
-    __tablename__ = 'cards'
-    id = db.Column(db.String(50), primary_key=True)
-    level = db.Column(db.Integer, nullable=False)
-    owner = db.Column(db.String(100), nullable=False)
+# ─── Base de données ─────────────────────────────────────────────────────────
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    def to_dict(self):
-        return {"id": self.id, "level": self.level, "owner": self.owner}
 
-class CardReader(db.Model):
-    __tablename__ = 'cardReaders'
-    id = db.Column(db.String(50), primary_key=True)
-    level = db.Column(db.Integer, nullable=False)
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.executescript("""
+        CREATE TABLE IF NOT EXISTS cards (
+            id      TEXT PRIMARY KEY,
+            level   INTEGER NOT NULL DEFAULT 1,
+            owner   TEXT    NOT NULL DEFAULT ''
+        );
 
-    def to_dict(self):
-        return {"id": self.id, "level": self.level}
+        CREATE TABLE IF NOT EXISTS cardReaders (
+            id      TEXT PRIMARY KEY,
+            level   INTEGER NOT NULL DEFAULT 1
+        );
 
-class Log(db.Model):
-    __tablename__ = 'logs'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    cardId = db.Column(db.String(50), nullable=False)
-    cardreaderId = db.Column(db.String(50), nullable=False)
-    date = db.Column(db.DateTime, default=datetime.utcnow)
-    levelInScan = db.Column(db.Integer, nullable=False)
-    access_granted = db.Column(db.Boolean, nullable=False)
+        CREATE TABLE IF NOT EXISTS logs (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            cardId        TEXT    NOT NULL,
+            cardReaderId  TEXT    NOT NULL,
+            date          TEXT    NOT NULL,
+            levelInScan   INTEGER NOT NULL
+        );
+    """)
+    conn.commit()
+    conn.close()
+    log.info("Base de données initialisée : %s", DB_PATH)
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "cardId": self.cardId,
-            "cardreaderId": self.cardreaderId,
-            "date": self.date.isoformat(),
-            "levelInScan": self.levelInScan,
-            "access_granted": self.access_granted
-        }
 
-# Création automatique des tables si elles n'existent pas
-with app.app_context():
-    db.create_all()
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+def row_to_dict(row):
+    return dict(row) if row else None
 
-# ==========================================
-# ROUTES ADMIN : Utilisateurs (Cards)
-# ==========================================
 
-@app.route('/admin/cards', methods=['POST'])
-def add_card():
-    data = request.json
-    if Card.query.get(data['id']):
-        return jsonify({"error": "Card already exists"}), 400
-    new_card = Card(id=data['id'], level=data['level'], owner=data['owner'])
-    db.session.add(new_card)
-    db.session.commit()
-    return jsonify(new_card.to_dict()), 201
+def rows_to_list(rows):
+    return [dict(r) for r in rows]
 
-@app.route('/admin/cards/<card_id>', methods=['GET', 'PUT', 'DELETE'])
-def manage_card(card_id):
-    card = Card.query.get(card_id)
-    if not card:
-        return jsonify({"error": "Card not found"}), 404
 
-    if request.method == 'GET':
-        return jsonify(card.to_dict())
-    
-    elif request.method == 'PUT':
-        data = request.json
-        card.level = data.get('level', card.level)
-        card.owner = data.get('owner', card.owner)
-        db.session.commit()
-        return jsonify(card.to_dict())
-    
-    elif request.method == 'DELETE':
-        db.session.delete(card)
-        db.session.commit()
-        return jsonify({"message": "Card deleted"})
+def json_response(handler, status, data):
+    body = json.dumps(data, ensure_ascii=False).encode()
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", len(body))
+    handler.end_headers()
+    handler.wfile.write(body)
 
-@app.route('/admin/cards/search', methods=['GET'])
-def search_cards():
-    pattern = request.args.get('regex', '.*')
-    cards = Card.query.all()
-    # Filtrage Regex en Python
-    regex = re.compile(pattern, re.IGNORECASE)
-    result = [c.to_dict() for c in cards if regex.search(c.id) or regex.search(c.owner)]
-    return jsonify(result)
 
-# ==========================================
-# ROUTES ADMIN : Lecteurs de cartes (CardReaders)
-# ==========================================
+def error(handler, status, msg):
+    json_response(handler, status, {"error": msg})
 
-@app.route('/admin/readers', methods=['POST'])
-def add_reader():
-    data = request.json
-    if CardReader.query.get(data['id']):
-        return jsonify({"error": "Reader already exists"}), 400
-    new_reader = CardReader(id=data['id'], level=data['level'])
-    db.session.add(new_reader)
-    db.session.commit()
-    return jsonify(new_reader.to_dict()), 201
 
-@app.route('/admin/readers/<reader_id>', methods=['GET', 'PUT', 'DELETE'])
-def manage_reader(reader_id):
-    reader = CardReader.query.get(reader_id)
-    if not reader:
-        return jsonify({"error": "Reader not found"}), 404
+def parse_body(handler):
+    length = int(handler.headers.get("Content-Length", 0))
+    if length == 0:
+        return {}
+    raw = handler.rfile.read(length)
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {}
 
-    if request.method == 'GET':
-        return jsonify(reader.to_dict())
-    
-    elif request.method == 'PUT':
-        data = request.json
-        reader.level = data.get('level', reader.level)
-        db.session.commit()
-        return jsonify(reader.to_dict())
-    
-    elif request.method == 'DELETE':
-        db.session.delete(reader)
-        db.session.commit()
-        return jsonify({"message": "Reader deleted"})
 
-@app.route('/admin/readers/search', methods=['GET'])
-def search_readers():
-    pattern = request.args.get('regex', '.*')
-    readers = CardReader.query.all()
-    regex = re.compile(pattern, re.IGNORECASE)
-    result = [r.to_dict() for r in readers if regex.search(r.id)]
-    return jsonify(result)
+# ─── Logique métier ──────────────────────────────────────────────────────────
+def check_card(card_id, reader_id):
+    """
+    Vérifie si la carte card_id est autorisée sur le lecteur reader_id.
+    - Logue l'événement en base et dans les logs système.
+    - Retourne (valid: bool, level_in_scan: int)
+    """
+    conn = get_db()
+    cur = conn.cursor()
 
-# ==========================================
-# ROUTES ADMIN : Logs
-# ==========================================
+    card   = row_to_dict(cur.execute("SELECT * FROM cards WHERE id=?", (card_id,)).fetchone())
+    reader = row_to_dict(cur.execute("SELECT * FROM cardReaders WHERE id=?", (reader_id,)).fetchone())
 
-@app.route('/admin/logs/search', methods=['GET'])
-def search_logs():
-    pattern = request.args.get('regex', '.*')
-    limit = int(request.args.get('limit', 100))
-    
-    logs = Log.query.order_by(Log.date.desc()).all()
-    regex = re.compile(pattern, re.IGNORECASE)
-    
-    result = []
-    for log in logs:
-        # On peut chercher la regex dans cardId ou cardreaderId
-        if regex.search(log.cardId) or regex.search(log.cardreaderId):
-            result.append(log.to_dict())
-            if len(result) >= limit:
-                break
-                
-    return jsonify(result)
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
-# ==========================================
-# ROUTE PUBLIQUE : SCAN CHECK
-# ==========================================
+    if card is None or reader is None:
+        level_in_scan = card["level"] if card else 0
+        valid = False
+    else:
+        level_in_scan = card["level"]
+        valid = card["level"] >= reader["level"]
 
-@app.route('/scan', methods=['POST'])
-def check_scan():
-    """Vérifie si une carte a accès à un lecteur spécifique."""
-    data = request.json
-    card_id = data.get('cardId')
-    reader_id = data.get('readerId')
-
-    if not card_id or not reader_id:
-        return jsonify({"valid": False}), 400
-
-    card = Card.query.get(card_id)
-    reader = CardReader.query.get(reader_id)
-
-    # Déterminer si l'accès est valide
-    is_valid = False
-    level_in_scan = 0
-    
-    if card and reader:
-        level_in_scan = reader.level
-        if card.level >= reader.level:
-            is_valid = True
-
-    # Logger l'action
-    new_log = Log(
-        cardId=card_id, 
-        cardreaderId=reader_id, 
-        levelInScan=level_in_scan, 
-        access_granted=is_valid
+    # Enregistrement en base
+    cur.execute(
+        "INSERT INTO logs (cardId, cardReaderId, date, levelInScan) VALUES (?,?,?,?)",
+        (card_id, reader_id, now, level_in_scan)
     )
-    db.session.add(new_log)
-    db.session.commit()
+    conn.commit()
+    conn.close()
 
-    # Afficher dans la console (print)
-    print(f"[{datetime.now()}] SCAN - Card: {card_id} | Reader: {reader_id} | Granted: {is_valid}")
+    # Log console
+    status_str = "ACCÈS ACCORDÉ" if valid else "ACCÈS REFUSÉ"
+    log.info("[SCAN] card=%s reader=%s level=%d → %s", card_id, reader_id, level_in_scan, status_str)
 
-    # Réponse minimaliste sans détails comme demandé
-    return jsonify({"valid": is_valid})
+    return valid, level_in_scan
 
-if __name__ == '__main__':
-    # host='0.0.0.0' permet d'accepter les connexions venant d'autres appareils
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+# ─── Routeur ─────────────────────────────────────────────────────────────────
+class Handler(BaseHTTPRequestHandler):
+
+    def log_message(self, fmt, *args):
+        pass  # On gère nos propres logs
+
+    def route(self, method):
+        parsed = urlparse(self.path)
+        path   = parsed.path.rstrip("/")
+        qs     = parse_qs(parsed.query)
+
+        routes = [
+            # Cards
+            ("POST",   "/admin/cards",          self.card_create),
+            ("GET",    "/admin/cards",           self.card_list),
+            ("GET",    r"/admin/cards/([^/]+)",  self.card_get),
+            ("PUT",    r"/admin/cards/([^/]+)",  self.card_update),
+            ("DELETE", r"/admin/cards/([^/]+)",  self.card_delete),
+            # CardReaders
+            ("POST",   "/admin/readers",         self.reader_create),
+            ("GET",    "/admin/readers",          self.reader_list),
+            ("GET",    r"/admin/readers/([^/]+)", self.reader_get),
+            ("PUT",    r"/admin/readers/([^/]+)", self.reader_update),
+            ("DELETE", r"/admin/readers/([^/]+)", self.reader_delete),
+            # Logs
+            ("GET",    "/admin/logs",            self.logs_list),
+            # Check
+            ("POST",   "/check",                 self.check),
+        ]
+
+        for m, pattern, handler_fn in routes:
+            if m != method:
+                continue
+            # Correspondance exacte ou regex
+            if pattern.startswith("r\"") or re.search(r"[()\\]", pattern):
+                match = re.fullmatch(pattern.strip('r"'), path)
+                if match:
+                    handler_fn(qs, match.groups())
+                    return
+            else:
+                if path == pattern:
+                    handler_fn(qs, ())
+                    return
+
+        error(self, 404, "Route introuvable")
+
+    def do_GET(self):    self.route("GET")
+    def do_POST(self):   self.route("POST")
+    def do_PUT(self):    self.route("PUT")
+    def do_DELETE(self): self.route("DELETE")
+
+    # ── Cards ──────────────────────────────────────────────────────────────
+    def card_create(self, qs, groups):
+        body = parse_body(self)
+        cid  = body.get("id", "").strip()
+        if not cid:
+            return error(self, 400, "Champ 'id' requis")
+        level = int(body.get("level", 1))
+        owner = body.get("owner", "")
+        try:
+            conn = get_db()
+            conn.execute("INSERT INTO cards (id, level, owner) VALUES (?,?,?)", (cid, level, owner))
+            conn.commit()
+            conn.close()
+            json_response(self, 201, {"id": cid, "level": level, "owner": owner})
+        except sqlite3.IntegrityError:
+            error(self, 409, f"Carte '{cid}' existe déjà")
+
+    def card_list(self, qs, groups):
+        pattern = qs.get("q", [None])[0]
+        conn = get_db()
+        if pattern:
+            rows = conn.execute("SELECT * FROM cards WHERE id REGEXP ?", (pattern,)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM cards").fetchall()
+        conn.close()
+        json_response(self, 200, rows_to_list(rows))
+
+    def card_get(self, qs, groups):
+        cid = groups[0]
+        conn = get_db()
+        row = conn.execute("SELECT * FROM cards WHERE id=?", (cid,)).fetchone()
+        conn.close()
+        if row is None:
+            return error(self, 404, "Carte introuvable")
+        json_response(self, 200, row_to_dict(row))
+
+    def card_update(self, qs, groups):
+        cid  = groups[0]
+        body = parse_body(self)
+        conn = get_db()
+        row  = row_to_dict(conn.execute("SELECT * FROM cards WHERE id=?", (cid,)).fetchone())
+        if row is None:
+            conn.close()
+            return error(self, 404, "Carte introuvable")
+        level = int(body.get("level", row["level"]))
+        owner = body.get("owner", row["owner"])
+        conn.execute("UPDATE cards SET level=?, owner=? WHERE id=?", (level, owner, cid))
+        conn.commit()
+        conn.close()
+        json_response(self, 200, {"id": cid, "level": level, "owner": owner})
+
+    def card_delete(self, qs, groups):
+        cid = groups[0]
+        conn = get_db()
+        cur = conn.execute("DELETE FROM cards WHERE id=?", (cid,))
+        conn.commit()
+        conn.close()
+        if cur.rowcount == 0:
+            return error(self, 404, "Carte introuvable")
+        json_response(self, 200, {"deleted": cid})
+
+    # ── CardReaders ────────────────────────────────────────────────────────
+    def reader_create(self, qs, groups):
+        body = parse_body(self)
+        rid  = body.get("id", "").strip()
+        if not rid:
+            return error(self, 400, "Champ 'id' requis")
+        level = int(body.get("level", 1))
+        try:
+            conn = get_db()
+            conn.execute("INSERT INTO cardReaders (id, level) VALUES (?,?)", (rid, level))
+            conn.commit()
+            conn.close()
+            json_response(self, 201, {"id": rid, "level": level})
+        except sqlite3.IntegrityError:
+            error(self, 409, f"Lecteur '{rid}' existe déjà")
+
+    def reader_list(self, qs, groups):
+        pattern = qs.get("q", [None])[0]
+        conn = get_db()
+        if pattern:
+            rows = conn.execute("SELECT * FROM cardReaders WHERE id REGEXP ?", (pattern,)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM cardReaders").fetchall()
+        conn.close()
+        json_response(self, 200, rows_to_list(rows))
+
+    def reader_get(self, qs, groups):
+        rid = groups[0]
+        conn = get_db()
+        row = conn.execute("SELECT * FROM cardReaders WHERE id=?", (rid,)).fetchone()
+        conn.close()
+        if row is None:
+            return error(self, 404, "Lecteur introuvable")
+        json_response(self, 200, row_to_dict(row))
+
+    def reader_update(self, qs, groups):
+        rid  = groups[0]
+        body = parse_body(self)
+        conn = get_db()
+        row  = row_to_dict(conn.execute("SELECT * FROM cardReaders WHERE id=?", (rid,)).fetchone())
+        if row is None:
+            conn.close()
+            return error(self, 404, "Lecteur introuvable")
+        level = int(body.get("level", row["level"]))
+        conn.execute("UPDATE cardReaders SET level=? WHERE id=?", (level, rid))
+        conn.commit()
+        conn.close()
+        json_response(self, 200, {"id": rid, "level": level})
+
+    def reader_delete(self, qs, groups):
+        rid = groups[0]
+        conn = get_db()
+        cur = conn.execute("DELETE FROM cardReaders WHERE id=?", (rid,))
+        conn.commit()
+        conn.close()
+        if cur.rowcount == 0:
+            return error(self, 404, "Lecteur introuvable")
+        json_response(self, 200, {"deleted": rid})
+
+    # ── Logs ───────────────────────────────────────────────────────────────
+    def logs_list(self, qs, groups):
+        card_q   = qs.get("card",   [None])[0]
+        reader_q = qs.get("reader", [None])[0]
+        limit    = qs.get("limit",  [None])[0]
+
+        sql    = "SELECT * FROM logs WHERE 1=1"
+        params = []
+
+        if card_q:
+            sql += " AND cardId REGEXP ?"
+            params.append(card_q)
+        if reader_q:
+            sql += " AND cardReaderId REGEXP ?"
+            params.append(reader_q)
+
+        sql += " ORDER BY id DESC"
+
+        if limit:
+            sql += " LIMIT ?"
+            params.append(int(limit))
+
+        conn = get_db()
+        rows = conn.execute(sql, params).fetchall()
+        conn.close()
+        json_response(self, 200, rows_to_list(rows))
+
+    # ── Check ──────────────────────────────────────────────────────────────
+    def check(self, qs, groups):
+        body      = parse_body(self)
+        card_id   = body.get("cardId",   "").strip()
+        reader_id = body.get("readerId", "").strip()
+
+        if not card_id or not reader_id:
+            return error(self, 400, "Champs 'cardId' et 'readerId' requis")
+
+        valid, _ = check_card(card_id, reader_id)
+        json_response(self, 200, {"valid": valid})
+
+
+# ─── Support REGEXP dans SQLite ──────────────────────────────────────────────
+def regexp(pattern, value):
+    try:
+        return bool(re.search(pattern, str(value)))
+    except re.error:
+        return False
+
+
+# Monkey-patch pour ajouter REGEXP à chaque nouvelle connexion
+_orig_connect = sqlite3.connect
+def _connect_with_regexp(*args, **kwargs):
+    conn = _orig_connect(*args, **kwargs)
+    conn.create_function("REGEXP", 2, regexp)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+sqlite3.connect = _connect_with_regexp  # type: ignore
+
+
+if __name__ == "__main__":
+    init_db()
+    # "0.0.0.0" permet d'écouter sur tout le réseau (LAN + WAN si port ouvert)
+    HOST, PORT = "0.0.0.0", 8000
+    server = HTTPServer((HOST, PORT), Handler)
+
+    # Récupération d'une IP plus explicite pour le log
+    import socket
+    local_ip = socket.gethostbyname(socket.gethostname())
+
+    log.info("🚀 Serveur d'accès démarré !")
+    log.info("👉 Local : http://localhost:%d", PORT)
+    log.info("👉 Réseau : http://%s:%d", local_ip, PORT)
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        log.info("Arrêt du serveur")
