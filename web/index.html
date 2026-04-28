@@ -1,0 +1,360 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contrôle d'accès</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    
+    body {
+      font-family: monospace;
+      font-size: 14px;
+      background: #f5f5f5;
+      color: #111;
+    }
+
+    /* ── Navbar ── */
+    nav {
+      background: #111;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 16px;
+      height: 44px;
+    }
+    nav .brand { font-weight: bold; margin-right: 24px; letter-spacing: .05em; }
+    nav a {
+      color: #ccc;
+      text-decoration: none;
+      padding: 0 14px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      border-bottom: 3px solid transparent;
+    }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #fff; border-bottom-color: #fff; }
+
+    /* ── Layout ── */
+    main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+    /* ── Sections ── */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    h2 { margin-bottom: 16px; font-size: 16px; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #eee; font-weight: bold; }
+    tr:hover td { background: #fafafa; }
+    td.actions { width: 120px; white-space: nowrap; }
+
+    /* ── Inputs & buttons ── */
+    input[type="text"], input[type="number"] {
+      border: 1px solid #bbb;
+      padding: 5px 8px;
+      font-family: monospace;
+      font-size: 13px;
+      width: 100%;
+    }
+    button {
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 13px;
+      padding: 5px 12px;
+      border: 1px solid #bbb;
+      background: #fff;
+    }
+    button:hover { background: #eee; }
+    button.danger { border-color: #c00; color: #c00; }
+    button.danger:hover { background: #fee; }
+    button.primary { background: #111; color: #fff; border-color: #111; }
+    button.primary:hover { background: #333; }
+
+    /* ── Status bar ── */
+    #status {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 6px 16px;
+      font-size: 12px;
+      background: #222;
+      color: #aaa;
+      display: none;
+    }
+    #status.visible { display: block; }
+    #status.ok { color: #6f6; }
+    #status.err { color: #f66; }
+
+    /* ── Empty state ── */
+    .empty { padding: 24px; text-align: center; color: #888; background: #fff; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">🔑 Accès</span>
+  <a href="#logs"    class="nav-link active" data-section="logs">Logs</a>
+  <a href="#users"   class="nav-link"        data-section="users">Cartes</a>
+  <a href="#readers" class="nav-link"        data-section="readers">Lecteurs</a>
+</nav>
+
+<main>
+
+  <!-- ── LOGS ── -->
+  <section id="logs" class="section active">
+    <h2>Logs d'accès</h2>
+    <div class="toolbar">
+      <input type="text" id="log-filter-card"   placeholder="Filtrer carte…"   style="width:160px">
+      <input type="text" id="log-filter-reader" placeholder="Filtrer lecteur…" style="width:160px">
+      <input type="number" id="log-limit" placeholder="Limite" value="100" style="width:80px">
+      <button onclick="loadLogs()">Actualiser</button>
+      <button class="danger" onclick="clearAllLogs()">Tout supprimer</button>
+    </div>
+    <table id="logs-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Carte</th>
+          <th>Lecteur</th>
+          <th>Date</th>
+          <th>Niveau</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="logs-body"></tbody>
+    </table>
+  </section>
+
+  <!-- ── CARTES (users) ── -->
+  <section id="users" class="section">
+    <h2>Cartes</h2>
+    <div class="toolbar">
+      <button onclick="loadCards()">Actualiser</button>
+      <button class="primary" onclick="openCreate('card')">+ Nouvelle carte</button>
+    </div>
+    <table id="cards-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Niveau</th>
+          <th>Propriétaire</th>
+          <th class="actions"></th>
+        </tr>
+      </thead>
+      <tbody id="cards-body"></tbody>
+    </table>
+  </section>
+
+  <!-- ── LECTEURS (readers) ── -->
+  <section id="readers" class="section">
+    <h2>Lecteurs</h2>
+    <div class="toolbar">
+      <button onclick="loadReaders()">Actualiser</button>
+      <button class="primary" onclick="openCreate('reader')">+ Nouveau lecteur</button>
+    </div>
+    <table id="readers-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Niveau</th>
+          <th class="actions"></th>
+        </tr>
+      </thead>
+      <tbody id="readers-body"></tbody>
+    </table>
+  </section>
+
+</main>
+
+<div id="status"></div>
+
+<script src="config.js"></script>
+<script>
+  // URL définie dans config.js
+  const API = CONFIG.api_ip;
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+  const links    = document.querySelectorAll(".nav-link");
+  const sections = document.querySelectorAll(".section");
+
+  function navigate(name) {
+    links.forEach(l => l.classList.toggle("active", l.dataset.section === name));
+    sections.forEach(s => s.classList.toggle("active", s.id === name));
+    location.hash = name;
+    if (name === "logs")    loadLogs();
+    if (name === "users")   loadCards();
+    if (name === "readers") loadReaders();
+  }
+
+  links.forEach(l => l.addEventListener("click", e => {
+    e.preventDefault();
+    navigate(l.dataset.section);
+  }));
+
+  // Initial navigation from hash
+  const initSection = location.hash.replace("#", "") || "logs";
+  navigate(["logs","users","readers"].includes(initSection) ? initSection : "logs");
+
+  // ── Status bar ─────────────────────────────────────────────────────────────
+  let _statusTimer;
+  function showStatus(msg, type = "ok") {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = `visible ${type}`;
+    clearTimeout(_statusTimer);
+    _statusTimer = setTimeout(() => el.className = "", 3000);
+  }
+
+  // ── Fetch helpers ──────────────────────────────────────────────────────────
+  async function api(method, path, body) {
+    const opts = { method, headers: { "Content-Type": "application/json" } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const r = await fetch(API + path, opts);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    return data;
+  }
+
+  // ── LOGS ───────────────────────────────────────────────────────────────────
+  async function loadLogs() {
+    const card   = document.getElementById("log-filter-card").value.trim();
+    const reader = document.getElementById("log-filter-reader").value.trim();
+    const limit  = document.getElementById("log-limit").value.trim();
+    let qs = "?";
+    if (card)   qs += `card=${encodeURIComponent(card)}&`;
+    if (reader) qs += `reader=${encodeURIComponent(reader)}&`;
+    if (limit)  qs += `limit=${encodeURIComponent(limit)}&`;
+
+    try {
+      const rows = await api("GET", "/admin/logs" + qs);
+      const tbody = document.getElementById("logs-body");
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty">Aucun log</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td>${esc(r.cardId)}</td>
+          <td>${esc(r.cardReaderId)}</td>
+          <td>${esc(r.date)}</td>
+          <td>${r.levelInScan}</td>
+          <td class="actions">
+            <button class="danger" onclick="deleteLog(${r.id})">Supprimer</button>
+          </td>
+        </tr>`).join("");
+    } catch(e) { showStatus("Erreur logs : " + e.message, "err"); }
+  }
+
+  async function deleteLog(id) {
+    if (!confirm(`Supprimer le log #${id} ?`)) return;
+    try {
+      await api("DELETE", `/admin/logs/${id}`);
+      showStatus(`Log #${id} supprimé`);
+      loadLogs();
+    } catch(e) { showStatus("Erreur : " + e.message, "err"); }
+  }
+
+  async function clearAllLogs() {
+    if (!confirm("Supprimer TOUS les logs ?")) return;
+    try {
+      await api("DELETE", "/admin/logs");
+      showStatus("Tous les logs supprimés");
+      loadLogs();
+    } catch(e) { showStatus("Erreur : " + e.message, "err"); }
+  }
+
+  // ── CARTES ─────────────────────────────────────────────────────────────────
+  async function loadCards() {
+    try {
+      const rows = await api("GET", "/admin/cards");
+      const tbody = document.getElementById("cards-body");
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty">Aucune carte</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${esc(r.id)}</td>
+          <td>${r.level}</td>
+          <td>${esc(r.owner)}</td>
+          <td class="actions">
+            <a href="edit.html?type=card&id=${encodeURIComponent(r.id)}">
+              <button>Modifier</button>
+            </a>
+            <button class="danger" onclick="deleteCard('${esc(r.id)}')">✕</button>
+          </td>
+        </tr>`).join("");
+    } catch(e) { showStatus("Erreur cartes : " + e.message, "err"); }
+  }
+
+  async function deleteCard(id) {
+    if (!confirm(`Supprimer la carte "${id}" ?`)) return;
+    try {
+      await api("DELETE", `/admin/cards/${encodeURIComponent(id)}`);
+      showStatus(`Carte "${id}" supprimée`);
+      loadCards();
+    } catch(e) { showStatus("Erreur : " + e.message, "err"); }
+  }
+
+  // ── LECTEURS ───────────────────────────────────────────────────────────────
+  async function loadReaders() {
+    try {
+      const rows = await api("GET", "/admin/readers");
+      const tbody = document.getElementById("readers-body");
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="3" class="empty">Aucun lecteur</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${esc(r.id)}</td>
+          <td>${r.level}</td>
+          <td class="actions">
+            <a href="edit.html?type=reader&id=${encodeURIComponent(r.id)}">
+              <button>Modifier</button>
+            </a>
+            <button class="danger" onclick="deleteReader('${esc(r.id)}')">✕</button>
+          </td>
+        </tr>`).join("");
+    } catch(e) { showStatus("Erreur lecteurs : " + e.message, "err"); }
+  }
+
+  async function deleteReader(id) {
+    if (!confirm(`Supprimer le lecteur "${id}" ?`)) return;
+    try {
+      await api("DELETE", `/admin/readers/${encodeURIComponent(id)}`);
+      showStatus(`Lecteur "${id}" supprimé`);
+      loadReaders();
+    } catch(e) { showStatus("Erreur : " + e.message, "err"); }
+  }
+
+  // ── Création rapide (modale légère) ───────────────────────────────────────
+  function openCreate(type) {
+    window.location.href = `edit.html?type=${type}&id=__new__`;
+  }
+
+  // ── Escape HTML ───────────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+</script>
+</body>
+</html>

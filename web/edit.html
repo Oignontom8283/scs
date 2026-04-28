@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Édition</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      font-size: 14px;
+      background: #f5f5f5;
+      color: #111;
+    }
+
+    nav {
+      background: #111;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      height: 44px;
+    }
+    nav .brand { font-weight: bold; margin-right: 24px; letter-spacing: .05em; }
+    nav a {
+      color: #ccc;
+      text-decoration: none;
+      padding: 0 14px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+    }
+    nav a:hover { color: #fff; }
+
+    main {
+      padding: 32px 24px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    h2 { margin-bottom: 24px; font-size: 16px; }
+
+    .field { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 12px; color: #555; }
+
+    input[type="text"], input[type="number"] {
+      border: 1px solid #bbb;
+      padding: 6px 8px;
+      font-family: monospace;
+      font-size: 14px;
+      width: 100%;
+      background: #fff;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: #888;
+      margin-top: 3px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    button {
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 13px;
+      padding: 7px 16px;
+      border: 1px solid #bbb;
+      background: #fff;
+    }
+    button:hover { background: #eee; }
+    button.primary { background: #111; color: #fff; border-color: #111; }
+    button.primary:hover { background: #333; }
+
+    #msg {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #c00;
+    }
+    #msg.ok { color: #060; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">🔑 Accès</span>
+  <a href="index.html" id="back-link">← Retour</a>
+</nav>
+
+<main>
+  <h2 id="page-title">…</h2>
+
+  <div class="field">
+    <label>ID</label>
+    <input type="text" id="field-id" placeholder="Identifiant unique">
+    <div class="hint" id="id-hint" style="display:none">Modifier l'ID renommera l'entrée.</div>
+  </div>
+
+  <div class="field">
+    <label>Niveau</label>
+    <input type="number" id="field-level" min="1" value="1">
+  </div>
+
+  <!-- Affiché seulement pour les cartes -->
+  <div class="field" id="owner-field">
+    <label>Propriétaire</label>
+    <input type="text" id="field-owner" placeholder="Nom du porteur">
+  </div>
+
+  <div class="actions">
+    <button class="primary" onclick="save()">Enregistrer</button>
+    <button onclick="cancel()">Annuler</button>
+  </div>
+
+  <div id="msg"></div>
+</main>
+
+<script src="config.js"></script>
+<script>
+  // URL définie dans config.js
+  const API    = CONFIG.api_ip;
+  const params = new URLSearchParams(location.search);
+  const TYPE   = params.get("type");   // "card" | "reader"
+  const ID     = params.get("id");     // id existant ou "__new__"
+  const isNew  = ID === "__new__";
+
+  const backSection = TYPE === "card" ? "#users" : "#readers";
+  const backUrl     = "index.html" + backSection;
+
+  document.getElementById("back-link").href = backUrl;
+
+  // ── Init page ─────────────────────────────────────────────────────────────
+  document.getElementById("page-title").textContent = isNew
+    ? (TYPE === "card" ? "Nouvelle carte" : "Nouveau lecteur")
+    : (TYPE === "card" ? `Modifier carte` : `Modifier lecteur`);
+
+  if (TYPE === "reader") {
+    document.getElementById("owner-field").style.display = "none";
+  }
+
+  if (!isNew) {
+    document.getElementById("id-hint").style.display = "block";
+    loadExisting();
+  }
+
+  async function loadExisting() {
+    try {
+      const path = TYPE === "card"
+        ? `/admin/cards/${encodeURIComponent(ID)}`
+        : `/admin/readers/${encodeURIComponent(ID)}`;
+      const data = await apiFetch("GET", path);
+      document.getElementById("field-id").value    = data.id    ?? "";
+      document.getElementById("field-level").value = data.level ?? 1;
+      if (TYPE === "card") {
+        document.getElementById("field-owner").value = data.owner ?? "";
+      }
+    } catch (e) {
+      showMsg("Erreur chargement : " + e.message);
+    }
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  async function save() {
+    const newId = document.getElementById("field-id").value.trim();
+    const level = parseInt(document.getElementById("field-level").value, 10);
+    const owner = document.getElementById("field-owner").value.trim();
+
+    if (!newId)           { showMsg("L'ID est requis.");    return; }
+    if (isNaN(level) || level < 1) { showMsg("Niveau invalide."); return; }
+
+    let body, method, path;
+
+    if (isNew) {
+      method = "POST";
+      path   = TYPE === "card" ? "/admin/cards" : "/admin/readers";
+      body   = TYPE === "card"
+        ? { id: newId, level, owner }
+        : { id: newId, level };
+    } else {
+      method = "PUT";
+      // L'URL cible toujours l'ancien ID ; le body contient le nouvel ID
+      path   = TYPE === "card"
+        ? `/admin/cards/${encodeURIComponent(ID)}`
+        : `/admin/readers/${encodeURIComponent(ID)}`;
+      body   = TYPE === "card"
+        ? { id: newId, level, owner }
+        : { id: newId, level };
+    }
+
+    try {
+      await apiFetch(method, path, body);
+      showMsg(isNew ? "Créé avec succès." : "Modifié avec succès.", true);
+      setTimeout(() => { window.location.href = backUrl; }, 600);
+    } catch (e) {
+      showMsg("Erreur : " + e.message);
+    }
+  }
+
+  function cancel() {
+    window.location.href = backUrl;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  async function apiFetch(method, path, body) {
+    const opts = { method, headers: { "Content-Type": "application/json" } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const r = await fetch(API + path, opts);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    return data;
+  }
+
+  function showMsg(text, ok = false) {
+    const el = document.getElementById("msg");
+    el.textContent = text;
+    el.className   = ok ? "ok" : "";
+  }
+</script>
+</body>
+</html>

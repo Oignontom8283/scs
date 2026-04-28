@@ -1,0 +1,31 @@
+2026-04-28T17:36:21 [INFO    ] Base de données initialisée : /home/pi/projects/scs/api/access_control.db
+2026-04-28T17:36:21 [INFO    ] 🚀 Serveur d'accès démarré
+2026-04-28T17:36:21 [INFO    ]    Local   → http://localhost:8000
+2026-04-28T17:36:21 [INFO    ]    Réseau  → http://127.0.1.1:8000
+2026-04-28T17:36:21 [INFO    ]    Logs    → /home/pi/projects/scs/api/access_control.log
+2026-04-28T17:36:26 [INFO    ] Arrêt du serveur
+2026-04-28T17:39:24 [INFO    ] Base de données initialisée : /home/pi/projects/scs/api/access_control.db
+2026-04-28T17:39:24 [INFO    ] 🚀 Serveur d'accès démarré
+2026-04-28T17:39:24 [INFO    ]    Local   → http://localhost:8000
+2026-04-28T17:39:24 [INFO    ]    Réseau  → http://127.0.1.1:8000
+2026-04-28T17:39:24 [INFO    ]    Logs    → /home/pi/projects/scs/api/access_control.log
+2026-04-28T19:00:04 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-04-28T19:00:04 [INFO    ] Serveur d'acces demarre
+2026-04-28T19:00:04 [INFO    ]   Local  -> http://localhost:8000
+2026-04-28T19:00:04 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-04-28T19:00:04 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-04-28T19:29:25 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-04-28T19:29:25 [INFO    ] Serveur d'acces demarre
+2026-04-28T19:29:25 [INFO    ]   Local  -> http://localhost:8000
+2026-04-28T19:29:25 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-04-28T19:29:25 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-04-28T20:03:30 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-04-28T20:03:30 [INFO    ] Serveur d'acces demarre
+2026-04-28T20:03:30 [INFO    ]   Local  -> http://localhost:8000
+2026-04-28T20:03:30 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-04-28T20:03:30 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-04-28T20:03:34 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-04-28T20:03:34 [INFO    ] Serveur d'acces demarre
+2026-04-28T20:03:34 [INFO    ]   Local  -> http://localhost:8000
+2026-04-28T20:03:34 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-04-28T20:03:34 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
