@@ -29,3 +29,18 @@
 2026-04-28T20:03:34 [INFO    ]   Local  -> http://localhost:8000
 2026-04-28T20:03:34 [INFO    ]   Reseau -> http://127.0.1.1:8000
 2026-04-28T20:03:34 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-04-28T20:18:51 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-04-28T20:18:51 [INFO    ] Serveur d'acces demarre
+2026-04-28T20:18:51 [INFO    ]   Local  -> http://localhost:8000
+2026-04-28T20:18:51 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-04-28T20:18:51 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-04-28T22:59:38 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-04-28T22:59:38 [INFO    ] Serveur d'acces demarre
+2026-04-28T22:59:38 [INFO    ]   Local  -> http://localhost:8000
+2026-04-28T22:59:38 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-04-28T22:59:38 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-04-29T00:16:32 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-04-29T00:16:32 [INFO    ] Serveur d'acces demarre
+2026-04-29T00:16:32 [INFO    ]   Local  -> http://localhost:8000
+2026-04-29T00:16:32 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-04-29T00:16:32 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
