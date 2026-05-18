@@ -44,3 +44,28 @@
 2026-04-29T00:16:32 [INFO    ]   Local  -> http://localhost:8000
 2026-04-29T00:16:32 [INFO    ]   Reseau -> http://127.0.1.1:8000
 2026-04-29T00:16:32 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-05-18T08:45:56 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-05-18T08:53:25 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-05-18T08:53:25 [INFO    ] Serveur d'acces demarre
+2026-05-18T08:53:25 [INFO    ]   Local  -> http://localhost:8000
+2026-05-18T08:53:25 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-05-18T08:53:25 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-05-18T09:14:26 [INFO    ] [SCAN] card=742817220941 reader=READER-PI-1 level=2 -> ACCES REFUSE
+2026-05-18T09:14:36 [INFO    ] [SCAN] card=742817220941 reader=READER-PI-1 level=2 -> ACCES REFUSE
+2026-05-18T09:14:39 [INFO    ] [SCAN] card=742817220941 reader=READER-PI-1 level=2 -> ACCES REFUSE
+2026-05-18T09:14:51 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
+2026-05-18T09:14:54 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
+2026-05-18T09:25:50 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
+2026-05-18T09:25:53 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
+2026-05-18T09:25:56 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
+2026-05-18T09:36:08 [INFO    ] [ADMIN] Tous les logs supprimes (8 lignes)
+2026-05-18T09:36:12 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
+2026-05-18T09:36:16 [INFO    ] [SCAN] card=742817220941 reader=READER-PI-1 level=2 -> ACCES REFUSE
+2026-05-18T09:37:28 [INFO    ] Base de donnees initialisee : /home/pi/projects/scs/api/access_control.db
+2026-05-18T09:37:28 [INFO    ] Serveur d'acces demarre
+2026-05-18T09:37:28 [INFO    ]   Local  -> http://localhost:8000
+2026-05-18T09:37:28 [INFO    ]   Reseau -> http://127.0.1.1:8000
+2026-05-18T09:37:28 [INFO    ]   Logs   -> /home/pi/projects/scs/api/access_control.log
+2026-05-18T09:37:49 [INFO    ] [SCAN] card=742817220941 reader=READER-PI-1 level=2 -> ACCES REFUSE
+2026-05-18T09:37:54 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
+2026-05-18T09:42:34 [INFO    ] [SCAN] card=940615131966 reader=READER-PI-1 level=4 -> ACCES ACCORDE
