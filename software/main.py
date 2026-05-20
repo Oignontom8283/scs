@@ -43,10 +43,10 @@ def verifier_badge(card_id: str) -> bool:
 
 
 # ─── Boucle principale ───────────────────────────────────────
-print("=== Lecteur RFID prêt ===")
+print("Lecteur prêt !")
 print(f"API : {API_BASE_URL}")
 print(f"Lecteur ID : {READER_ID}")
-print("Approchez votre carte ou badge...\n")
+print("...\n")
 
 try:
     while True:
@@ -54,13 +54,13 @@ try:
         print(f"Badge détecté : {card_id}")
 
         if verifier_badge(card_id):
-            print("✅ Accès AUTORISÉ")
+            print("Accès AUTORISÉ")
             flash_led(LED_VERT, duree=2)
         else:
-            print("❌ Accès REFUSÉ")
+            print("Accès REFUSÉ")
             flash_led(LED_ROUGE, duree=2)
 
-        print("En attente du prochain badge...\n")
+        print("...\n")
         time.sleep(1)   # Petite pause pour éviter les double-lectures
 
 finally:
